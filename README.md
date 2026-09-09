@@ -158,6 +158,29 @@ Automations. Use `deepcode`, `deepcode desktop`, or `deepcode web`; see
 
 ## News
 
+**2026-09-09 · TUI, Desktop, and Web share one local background service**
+
+- **Choose your interface.** Run `deepcode` for the TUI, `deepcode desktop`
+  for the native app, or `deepcode web` to open the workbench in your browser.
+  All three connect to the same local service; Web needs no DeepCode account.
+- **Continue the same task across interfaces.** Closing a client leaves running
+  work in the background. Reconnect from another interface to follow the same
+  conversation, review tool activity, and respond to approvals. The computer
+  must remain awake, and pending approvals still need your response.
+- **Configure and verify your models.** Save cloud or local model connections
+  for use across all three interfaces. Browse available models, check a model's
+  response, and test streaming and tool calls before using a custom server.
+  See [Models and providers](docs/guide/models.md).
+- **Manage your background service and prepare for upgrades.** Use
+  `deepcode service` commands to check status, read logs, or stop after current
+  work finishes. Create a runtime snapshot before upgrading and restore it when
+  needed; keep project files in your usual version control or backup.
+  See [Upgrading DeepCode](docs/UPGRADE_AND_RESTORE.md).
+
+Start with the updated [Quick start](#quick-start) and
+[first coding task tutorial](docs/guide/getting-started.md).
+([#212](https://github.com/HKUDS/DeepCode/pull/212))
+
 **2026-09-06 · DeepCode v2.2.0: Session context-window caps, compaction that leaves a memory, and a fully localized Desktop**
 
 - **Cap a Session's context window.** `/context 64k` in the TUI or the
