@@ -15,6 +15,7 @@ from core.config import deepcode_home
 from core.file_lock import exclusive_file_lock
 from core.persistence.migrations import (
     LATEST_SCHEMA_VERSION,
+    MigrationError,
     current_version,
     migrate,
 )
@@ -37,10 +38,27 @@ class Database:
             Path(path).expanduser().resolve() if path else default_database_path()
         )
 
+    @property
+    def restore_marker(self) -> Path:
+        return self.path.with_name(self.path.name + ".restore.json")
+
+    @property
+    def restore_recovery_marker(self) -> Path:
+        return self.path.with_name(self.path.name + ".restored.json")
+
     def initialize(self, *, target_version: int = LATEST_SCHEMA_VERSION) -> None:
         ensure_private_directory(self.path.parent)
         with exclusive_file_lock(self._migration_lock_path()):
+            if self.restore_marker.exists():
+                raise RuntimeError(
+                    "A state restore is pending. Resume it with deepcode service restore before starting the application."
+                )
             had_existing_database = self._has_existing_database()
+            installed = self.schema_version()
+            if installed > target_version:
+                raise MigrationError(
+                    f"database schema {installed} is newer than supported {target_version}"
+                )
             connection = self._connect()
             try:
                 self._enable_wal(connection)
@@ -61,8 +79,11 @@ class Database:
 
         if not self._has_existing_database():
             return 0
-        with self.read() as connection:
+        connection = sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True)
+        try:
             return current_version(connection)
+        finally:
+            connection.close()
 
     @staticmethod
     def _enable_wal(connection: sqlite3.Connection) -> None:

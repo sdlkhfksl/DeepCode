@@ -102,6 +102,10 @@ def _run_icacls(executable: str, path: Path, *arguments: str) -> bool:
             errors="replace",
             timeout=15,
             check=True,
+            # A detached service has no console to inherit. Avoid allocating
+            # a new console for every ACL helper it launches.
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -320,3 +324,30 @@ __all__ = [
     "open_existing_private_file",
     "open_private_file",
 ]
+
+
+def atomic_write_private_json(path: Path, value: object) -> None:
+    """Publish private JSON durably; callers own any cross-process mutation lock."""
+    import json
+    import uuid
+
+    ensure_private_directory(path.parent)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    payload = (
+        json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    ).encode()
+    descriptor = open_private_file(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)

@@ -97,7 +97,6 @@ def _run(args: argparse.Namespace) -> int:
                         connection_id=args.connection,
                         reasoning_effort=args.reasoning_effort,
                         token_budget=args.token_budget,
-                        max_iterations=args.max_iterations,
                         trust_workspace=args.trust,
                         access_preset=parse_access_preset(args.access),
                     ),
@@ -118,7 +117,6 @@ def _run(args: argparse.Namespace) -> int:
                         reasoning_effort=args.reasoning_effort,
                         skill_identifiers=tuple(args.skill),
                         token_budget=args.token_budget,
-                        max_iterations=args.max_iterations,
                         trust_workspace=args.trust,
                         access_preset=parse_access_preset(args.access),
                     ),
@@ -216,12 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="Total budget for a new Goal, or a larger budget when resuming.",
-    )
-    parser.add_argument(
-        "--max-iterations",
-        type=int,
-        default=None,
-        help="Optional model-sampling limit for diagnostics (unlimited by default).",
     )
     args = parser.parse_args(argv)
     if (args.goal is None) == (args.resume is None):
