@@ -15,7 +15,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 DESKTOP_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = DESKTOP_ROOT.parent
 BUILD_ROOT = DESKTOP_ROOT / "build" / "sidecar"
@@ -23,6 +22,7 @@ DIST_ROOT = BUILD_ROOT / "dist"
 APP_SERVER_ROOT = DIST_ROOT / "deepcode-app-server"
 SIDECAR_ENV_ROOT = BUILD_ROOT / ".venv"
 BUNDLED_DATA = (
+    (REPOSITORY_ROOT / "app_server" / "web_assets", "app_server/web_assets"),
     (
         REPOSITORY_ROOT / "core" / "application" / "goal_prompts",
         "core/application/goal_prompts",
@@ -201,6 +201,7 @@ def _verify_bundle(binary: Path) -> None:
         result.get("ok") is not True
         or result.get("skillCreator") is not True
         or not result.get("bundledMcpPresets")
+        or result.get("webAssets") is not True
     ):
         raise RuntimeError("packaged runtime import probe did not report success")
 
@@ -210,13 +211,23 @@ def _verify_bundle(binary: Path) -> None:
     database = smoke_root / "state.sqlite3"
     environment = dict(os.environ)
     environment["DEEPCODE_HOME"] = str(home)
-    process = subprocess.Popen(
-        [str(binary), "--database", str(database)],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    environment["DEEPCODE_SESSIONS_DIR"] = str(home / "sessions")
+    subprocess.run(
+        [
+            str(binary),
+            "--service",
+            "start",
+            "--database",
+            str(database),
+            "--port",
+            "0",
+            "--json",
+        ],
         env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=45,
     )
     initialize = {
         "jsonrpc": "2.0",
@@ -228,18 +239,46 @@ def _verify_bundle(binary: Path) -> None:
         },
     }
     shutdown = {"jsonrpc": "2.0", "id": 2, "method": "shutdown", "params": {}}
+    process = None
     try:
+        process = subprocess.Popen(
+            [str(binary), "--database", str(database)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=environment,
+        )
         stdout, stderr = process.communicate(
             f"{json.dumps(initialize)}\n{json.dumps(shutdown)}\n",
             timeout=30,
         )
     except subprocess.TimeoutExpired:
+        assert process is not None
         process.kill()
         stdout, stderr = process.communicate()
         raise RuntimeError(
             f"packaged App Server smoke timed out: {stderr[-2_000:]}"
         ) from None
     finally:
+        subprocess.run(
+            [
+                str(binary),
+                "--service",
+                "stop",
+                "--database",
+                str(database),
+                "--cancel-running",
+                "--timeout",
+                "3",
+                "--json",
+            ],
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=35,
+        )
         shutil.rmtree(smoke_root, ignore_errors=True)
     if process.returncode != 0:
         raise RuntimeError(

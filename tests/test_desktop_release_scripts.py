@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_ROOT = REPOSITORY_ROOT / "desktop" / "scripts"
 
@@ -175,7 +174,14 @@ def test_sidecar_bundles_every_file_backed_runtime_resource():
     }
 
     assert ("core/mcp/presets.json", "core/mcp") in bundled
-    assert all(source.exists() for source, _destination in sidecar_build.BUNDLED_DATA)
+    assert ("app_server/web_assets", "app_server/web_assets") in bundled
+    # The frontend is a generated release input; source-only Python test jobs
+    # need not have run npm. build-sidecar itself requires it before packaging.
+    assert all(
+        source.exists()
+        for source, destination in sidecar_build.BUNDLED_DATA
+        if destination != "app_server/web_assets"
+    )
 
 
 def test_python_audit_preserves_virtualenv_executable_symlink(

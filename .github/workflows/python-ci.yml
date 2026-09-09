@@ -75,6 +75,10 @@ jobs:
           tests/test_private_storage_windows.py
           tests/test_harness_sandbox.py
           tests/test_exec_sandbox_wiring.py
+          tests/app_server/test_windows_task.py
+          tests/app_server/test_state_backup.py
+          tests/test_provider_oauth.py
+          tests/test_provider_protocols.py
 
   package:
     runs-on: ubuntu-latest
@@ -89,6 +93,19 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      - name: Set up Node for packaged web assets
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Build packaged browser client
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run build:web
 
       - name: Build distributions
         run: |
