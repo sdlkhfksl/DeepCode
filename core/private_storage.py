@@ -102,6 +102,10 @@ def _run_icacls(executable: str, path: Path, *arguments: str) -> bool:
             errors="replace",
             timeout=15,
             check=True,
+            # A detached service has no console to inherit. Avoid allocating
+            # a new console for every ACL helper it launches.
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError):
         return False
