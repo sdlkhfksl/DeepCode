@@ -190,22 +190,33 @@ def test_background_start_is_idempotent_and_does_not_depend_on_stdin(tmp_path):
             stop_service(files, timeout=0, cancel_running=True)
 
 
-def test_foreground_service_exits_cleanly_after_control_stop(tmp_path):
+@pytest.mark.parametrize("log_to_file", [False, True])
+@pytest.mark.parametrize("detached", [False, True])
+def test_service_exits_cleanly_after_control_stop(tmp_path, log_to_file, detached):
     files = ServiceFiles(tmp_path / "state.sqlite3")
     process = subprocess.Popen(
         [
             sys.executable,
-            "-m",
-            "app_server.service",
+            "-c",
+            "import faulthandler, runpy; "
+            "faulthandler.dump_traceback_later(12); "
+            "runpy.run_module('app_server.service', run_name='__main__')",
             "--database",
             str(files.database),
             "--port",
             "0",
+            *(["--log-file"] if log_to_file else []),
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=Path(__file__).resolve().parents[2],
+        start_new_session=detached and os.name != "nt",
+        creationflags=(
+            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            if detached and os.name == "nt"
+            else 0
+        ),
     )
     try:
         deadline = time.monotonic() + 15
@@ -222,6 +233,14 @@ def test_foreground_service_exits_cleanly_after_control_stop(tmp_path):
         assert process.returncode == 0, stderr.decode()
         assert stdout == b""
         assert b"Traceback" not in stderr
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        _, stderr = process.communicate(timeout=5)
+        print(stderr.decode(errors="replace"))
+        if files.log.exists():
+            print(files.log.read_text(encoding="utf-8")[-4000:])
+        raise
     finally:
         if process.poll() is None:
             process.kill()
