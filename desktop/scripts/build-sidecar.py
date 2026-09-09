@@ -212,23 +212,6 @@ def _verify_bundle(binary: Path) -> None:
     environment = dict(os.environ)
     environment["DEEPCODE_HOME"] = str(home)
     environment["DEEPCODE_SESSIONS_DIR"] = str(home / "sessions")
-    subprocess.run(
-        [
-            str(binary),
-            "--service",
-            "start",
-            "--database",
-            str(database),
-            "--port",
-            "0",
-            "--json",
-        ],
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=45,
-    )
     initialize = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -241,6 +224,23 @@ def _verify_bundle(binary: Path) -> None:
     shutdown = {"jsonrpc": "2.0", "id": 2, "method": "shutdown", "params": {}}
     process = None
     try:
+        subprocess.run(
+            [
+                str(binary),
+                "--service",
+                "start",
+                "--database",
+                str(database),
+                "--port",
+                "0",
+                "--json",
+            ],
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
         process = subprocess.Popen(
             [str(binary), "--database", str(database)],
             stdin=subprocess.PIPE,
@@ -253,10 +253,23 @@ def _verify_bundle(binary: Path) -> None:
             f"{json.dumps(initialize)}\n{json.dumps(shutdown)}\n",
             timeout=30,
         )
+    except subprocess.CalledProcessError as exc:
+        service_log = database.with_name(database.name + ".service") / "service.log"
+        detail = (
+            service_log.read_text(encoding="utf-8", errors="replace")
+            if service_log.exists()
+            else "No service log was created."
+        )
+        raise RuntimeError(
+            f"packaged service startup failed ({exc.returncode}):\n"
+            f"{exc.stdout[-2_000:]}\n{exc.stderr[-2_000:]}\n{detail[-4_000:]}"
+        ) from exc
     except subprocess.TimeoutExpired:
-        assert process is not None
-        process.kill()
-        stdout, stderr = process.communicate()
+        if process is not None:
+            process.kill()
+            stdout, stderr = process.communicate()
+        else:
+            stderr = "Timed out starting the packaged service"
         raise RuntimeError(
             f"packaged App Server smoke timed out: {stderr[-2_000:]}"
         ) from None

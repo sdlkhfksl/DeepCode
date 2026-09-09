@@ -1390,7 +1390,10 @@ def test_startup_resume_shows_history_without_running_another_turn(
     from core.sessions.store import SessionStore
 
     rc, provider = _run_tui(
-        monkeypatch, tmp_path, "Remember this greeting task\n/exit\n", ["Greeting tests passed"]
+        monkeypatch,
+        tmp_path,
+        "Remember this greeting task\n/exit\n",
+        ["Greeting tests passed"],
     )
     assert rc == 0
     store = SessionStore(tmp_path / "sessions")
@@ -1398,9 +1401,12 @@ def test_startup_resume_shows_history_without_running_another_turn(
     capsys.readouterr()
     monkeypatch.setattr("sys.stdin", io.StringIO("/exit\n"))
 
-    assert tui_app.main(
-        ["--workspace", str(tmp_path / "ws"), "--resume", session.session_id]
-    ) == 0
+    assert (
+        tui_app.main(
+            ["--workspace", str(tmp_path / "ws"), "--resume", session.session_id]
+        )
+        == 0
+    )
 
     output = capsys.readouterr().out
     assert "Remember this greeting task" in output

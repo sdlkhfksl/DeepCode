@@ -266,12 +266,12 @@ class LLMProvider(ABC):
                     token = value.split(" ", 1)[1]
                     if token:
                         secrets.add(token)
-        for field in ("content", "error_type", "error_code"):
-            text = getattr(response, field)
+        for attribute in ("content", "error_type", "error_code"):
+            text = getattr(response, attribute)
             if isinstance(text, str):
                 for secret in sorted(secrets, key=len, reverse=True):
                     text = text.replace(secret, "[redacted]")
-                setattr(response, field, text)
+                setattr(response, attribute, text)
         return response
 
     input_modalities: tuple[str, ...] | None = None

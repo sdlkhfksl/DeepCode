@@ -448,8 +448,12 @@ def run(
     try:
         if application_factory is None and args.command == "run":
             from cli.service_automation import run_automation_service
-            result = run_automation_service(args.automation_id, request_id=args.request_id,
-                                           interactive=bool(not args.json and sys.stdin.isatty()))
+
+            result = run_automation_service(
+                args.automation_id,
+                request_id=args.request_id,
+                interactive=bool(not args.json and sys.stdin.isatty()),
+            )
         else:
             application = factory()
             result = _dispatch(application, args)

@@ -172,6 +172,7 @@ def main():
             raise SystemExit(desktop_run(sys.argv[2:]))
         elif sys.argv[1] == "web":
             from cli.web_cli import run as web_run
+
             raise SystemExit(web_run(sys.argv[2:]))
         elif sys.argv[1] == "serve":
             from app_server.service import main as serve_main
@@ -270,7 +271,10 @@ def main():
                         "",
                         "Examples:",
                         row("deepcode --trust", "Start in a project you trust"),
-                        row("deepcode --resume <session-id>", "Continue a saved conversation"),
+                        row(
+                            "deepcode --resume <session-id>",
+                            "Continue a saved conversation",
+                        ),
                         row("deepcode provider list", "Show model connections"),
                         row("deepcode service status", "Check the background service"),
                         row("deepcode test rice", "Test RICE paper reproduction"),

@@ -449,8 +449,8 @@ def main(argv: list[str] | None = None) -> int:
         asyncio.run(serve(files, args.port))
     except KeyboardInterrupt:
         return 130
-    except Exception:
-        logger.exception("DeepCode service failed")
+    except Exception as exc:
+        logger.exception("DeepCode service failed (%s): %s", type(exc).__name__, exc)
         return 1
     return 0
 

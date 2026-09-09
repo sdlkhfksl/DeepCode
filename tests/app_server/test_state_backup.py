@@ -177,6 +177,8 @@ def test_restored_application_pauses_goals_and_schedules_before_recovery(
         assert app.goals.read(created.thread.id).status is ThreadGoalStatus.ACTIVE
     finally:
         app.close()
+        # The injected store belongs to this caller, not the Application.
+        app.session_store.close()
     snapshot = tmp_path / "snapshot"
     create_snapshot(paths, snapshot)
     restore_snapshot(paths, snapshot, replace_data=True)
@@ -193,3 +195,5 @@ def test_restored_application_pauses_goals_and_schedules_before_recovery(
         assert not Database(paths.database).restore_recovery_marker.exists()
     finally:
         app.close()
+        # The injected store belongs to this caller, not the Application.
+        app.session_store.close()

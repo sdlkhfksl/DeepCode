@@ -220,3 +220,43 @@ def test_python_audit_preserves_virtualenv_executable_symlink(
     assert python_audit.main() == 0
     assert captured == [venv_python.absolute()]
     assert captured[0] != base_python.resolve()
+
+
+def test_packaged_startup_failure_reports_service_log_and_cleans_up(
+    tmp_path, monkeypatch
+):
+    import json
+    import subprocess
+
+    monkeypatch.setattr(sidecar_build, "BUILD_ROOT", tmp_path)
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        if "--verify-runtime" in command:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps(
+                    {
+                        "ok": True,
+                        "skillCreator": True,
+                        "bundledMcpPresets": ["test"],
+                        "webAssets": True,
+                    }
+                ),
+            )
+        if "start" in command:
+            log = tmp_path / "smoke/state.sqlite3.service/service.log"
+            log.parent.mkdir(parents=True)
+            log.write_text("Concrete startup failure from the worker", encoding="utf-8")
+            raise subprocess.CalledProcessError(
+                1, command, output="startup failed", stderr="launcher detail"
+            )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(sidecar_build.subprocess, "run", run)
+    with pytest.raises(RuntimeError, match="Concrete startup failure from the worker"):
+        sidecar_build._verify_bundle(tmp_path / "deepcode-app-server")
+    assert any("stop" in command for command in calls)
+    assert not (tmp_path / "smoke").exists()
