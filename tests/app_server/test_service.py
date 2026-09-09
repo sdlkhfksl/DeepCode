@@ -283,6 +283,7 @@ def test_cli_launcher_can_exit_while_the_service_remains_available(tmp_path):
 def test_stale_crash_record_with_a_brief_status_lock_still_restarts(tmp_path, _attempt):
     from app_server.service import serve
     from app_server.service_state import ServiceRecord
+    from cli.service_cli import _wait_ready
 
     async def scenario():
         files = ServiceFiles(tmp_path / "state.sqlite3")
@@ -299,15 +300,9 @@ def test_stale_crash_record_with_a_brief_status_lock_still_restarts(tmp_path, _a
             assert waiting_for_probe, (
                 "A stale record is not proof that the lock belongs to a live daemon"
             )
-            async with asyncio.timeout(5):
-                while True:
-                    try:
-                        ready = await asyncio.to_thread(
-                            ServiceClient(files).call, "status", timeout=0.5
-                        )
-                        break
-                    except ServiceUnavailable:
-                        await asyncio.sleep(0.02)
+            # Exercise the launcher's actual probe policy and the same startup
+            # budget as the other service tests, including Windows ACL setup.
+            ready = await asyncio.to_thread(_wait_ready, ServiceClient(files), 15)
             assert ready["instanceId"] != "a" * 32
             await asyncio.to_thread(
                 ServiceClient(files).call, "stop", {"timeout": 1, "cancelRunning": True}

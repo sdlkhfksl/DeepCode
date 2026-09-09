@@ -71,7 +71,7 @@ jobs:
       # they actually execute.
       - name: Verify Windows ACLs and Job Object sandbox
         run: >-
-          python -m pytest -q
+          python -m pytest -q --durations=10
           tests/test_private_storage_windows.py
           tests/test_harness_sandbox.py
           tests/test_exec_sandbox_wiring.py
