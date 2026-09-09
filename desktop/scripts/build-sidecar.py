@@ -253,6 +253,19 @@ def _verify_bundle(binary: Path) -> None:
             f"{json.dumps(initialize)}\n{json.dumps(shutdown)}\n",
             timeout=30,
         )
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"packaged App Server smoke failed ({process.returncode}): "
+                f"{stderr[-2_000:]}"
+            )
+        responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+        if (
+            len(responses) != 2
+            or responses[0].get("result", {}).get("protocolVersion") != "1.0"
+        ):
+            raise RuntimeError(
+                "packaged App Server smoke returned invalid RPC responses"
+            )
     except subprocess.CalledProcessError as exc:
         service_log = database.with_name(database.name + ".service") / "service.log"
         detail = (
@@ -274,36 +287,34 @@ def _verify_bundle(binary: Path) -> None:
             f"packaged App Server smoke timed out: {stderr[-2_000:]}"
         ) from None
     finally:
-        subprocess.run(
-            [
-                str(binary),
-                "--service",
-                "stop",
-                "--database",
-                str(database),
-                "--cancel-running",
-                "--timeout",
-                "3",
-                "--json",
-            ],
-            env=environment,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=35,
-        )
-        shutil.rmtree(smoke_root, ignore_errors=True)
-    if process.returncode != 0:
-        raise RuntimeError(
-            f"packaged App Server smoke failed ({process.returncode}): "
-            f"{stderr[-2_000:]}"
-        )
-    responses = [json.loads(line) for line in stdout.splitlines() if line.strip()]
-    if (
-        len(responses) != 2
-        or responses[0].get("result", {}).get("protocolVersion") != "1.0"
-    ):
-        raise RuntimeError("packaged App Server smoke returned invalid RPC responses")
+        failure = sys.exception()
+        try:
+            subprocess.run(
+                [
+                    str(binary),
+                    "--service",
+                    "stop",
+                    "--database",
+                    str(database),
+                    "--cancel-running",
+                    "--timeout",
+                    "3",
+                    "--json",
+                ],
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=35,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            detail = f"packaged service cleanup failed: {exc}"
+            if failure is None:
+                raise RuntimeError(detail) from exc
+            # Keep the original startup/protocol failure as the primary error.
+            failure.add_note(detail)
+        finally:
+            shutil.rmtree(smoke_root, ignore_errors=True)
 
 
 if __name__ == "__main__":

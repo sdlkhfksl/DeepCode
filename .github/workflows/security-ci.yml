@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: security-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   secret-scan:
@@ -46,8 +46,15 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changes
+        id: scope
+        uses: ./.github/actions/ci-scope
 
       - name: Set up Node
+        if: steps.scope.outputs.runtime_changed == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -55,6 +62,7 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
 
       - name: Set up Python
+        if: steps.scope.outputs.runtime_changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -64,9 +72,18 @@ jobs:
             desktop/sidecar-requirements.lock
 
       - name: Set up Rust
+        if: steps.scope.outputs.runtime_changed == 'true'
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust audit tools
+        if: steps.scope.outputs.runtime_changed == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+          key: audit-0.22.2
+
       - name: Audit Node dependencies
+        if: steps.scope.outputs.runtime_changed == 'true'
         working-directory: desktop
         run: |
           npm ci
@@ -75,6 +92,7 @@ jobs:
           npm sbom --sbom-format cyclonedx > build/security/node-sbom.json
 
       - name: Audit Python package dependencies
+        if: steps.scope.outputs.runtime_changed == 'true'
         run: |
           python -m pip install --upgrade pip pip-audit==2.10.1
           mkdir -p desktop/build/security
@@ -87,7 +105,14 @@ jobs:
             --output desktop/build/security/python-sbom.json
           rm -rf desktop/build/python-audit-env
 
+      - name: Audit pinned CI dependencies
+        if: steps.scope.outputs.runtime_changed == 'true'
+        run: >-
+          python -m pip_audit --requirement scripts/ci/requirements.lock
+          --no-deps --disable-pip
+
       - name: Audit locked App Server environment
+        if: steps.scope.outputs.runtime_changed == 'true'
         working-directory: desktop
         run: |
           npm run setup:sidecar
@@ -96,15 +121,18 @@ jobs:
             --output build/security/sidecar-sbom.json
 
       - name: Audit Rust dependencies
+        if: steps.scope.outputs.runtime_changed == 'true'
         run: |
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit --file desktop/src-tauri/Cargo.lock
 
       - name: Audit dependency licenses
+        if: steps.scope.outputs.runtime_changed == 'true'
         working-directory: desktop
         run: npm run audit:licenses
 
       - name: Upload audit reports
+        if: steps.scope.outputs.runtime_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dependency-security-reports

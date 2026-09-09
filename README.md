@@ -1318,6 +1318,9 @@ On Windows PowerShell, activate with `.\.venv\Scripts\Activate.ps1`.
 
 ### Verification
 
+To reproduce CI's Python environment and understand each check, see the
+[CI guide](docs/CI.md).
+
 ```bash
 uvx pre-commit run --all-files
 python -m compileall -q app_server cli core tools workflows

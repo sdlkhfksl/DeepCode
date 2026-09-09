@@ -1,4 +1,4 @@
-"""Classify whether a Git change can affect the Desktop application.
+"""Classify the full PR diff for runtime tests and Desktop builds.
 
 Desktop bundles the Python App Server, so its CI scope includes both ``desktop``
 and the Python runtime imported by the sidecar. Release-only scripts, tests, and
@@ -33,7 +33,7 @@ DESKTOP_IMPACT_FILES = frozenset(
         "deepcode.py",
         "requirements.txt",
         "rust-toolchain.toml",
-        "scripts/desktop_ci_scope.py",
+        "scripts/ci_scope.py",
     }
 )
 
@@ -47,6 +47,15 @@ def affects_desktop(paths: Iterable[str]) -> bool:
     )
 
 
+def affects_runtime(paths: Iterable[str]) -> bool:
+    """Only known documentation paths may bypass runtime tests."""
+    return any(
+        path not in {"README.md", "README_ZH.md", "CONTRIBUTORS.md"}
+        and not path.startswith(("docs/", "assets/readme/"))
+        for path in paths
+    )
+
+
 def _read_null_delimited_paths() -> list[str]:
     return [
         os.fsdecode(raw_path)
@@ -56,8 +65,13 @@ def _read_null_delimited_paths() -> list[str]:
 
 
 def main() -> int:
-    changed = affects_desktop(_read_null_delimited_paths())
-    print(f"desktop_changed={'true' if changed else 'false'}")
+    paths = _read_null_delimited_paths()
+    # Empty/unknown input must never silently turn off validation.
+    for name, changed in (
+        ("runtime_changed", not paths or affects_runtime(paths)),
+        ("desktop_changed", not paths or affects_desktop(paths)),
+    ):
+        print(f"{name}={'true' if changed else 'false'}")
     return 0
 
 

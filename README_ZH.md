@@ -1082,6 +1082,8 @@ Windows PowerShell 请使用 `.\.venv\Scripts\Activate.ps1` 激活环境。
 
 ### 验证
 
+复现 CI 的 Python 环境、了解各项检查及排查失败，请参考 [CI 指南](docs/CI.md)。
+
 ```bash
 uvx pre-commit run --all-files
 python -m compileall -q app_server cli core tools workflows
