@@ -80,6 +80,7 @@ jobs:
           tests/test_provider_oauth.py
           tests/test_provider_protocols.py
           tests/app_server/test_service.py
+          tests/app_server/test_service_discovery.py
 
   package:
     runs-on: ubuntu-latest

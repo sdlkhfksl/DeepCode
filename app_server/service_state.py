@@ -11,7 +11,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from core.file_lock import FileLease
+from core.file_lock import FileLease, exclusive_file_lock
 from core.private_storage import open_existing_private_file, open_private_file
 from core.version import __version__
 
@@ -62,6 +62,7 @@ class ServiceFiles:
         self.database = database.expanduser().resolve()
         self.directory = self.database.with_name(self.database.name + ".service")
         self.lock = self.directory / "instance.lock"
+        self._discovery_lock = self.directory / "discovery.lock"
         self.record = self.directory / "instance.json"
         self.token = self.directory / "token"
         self.log = self.directory / "service.log"
@@ -77,11 +78,15 @@ class ServiceFiles:
         return False
 
     def read(self) -> tuple[ServiceRecord, str] | None:
-        try:
-            value = json.loads(_read(self.record))
-            token = _read(self.token).strip()
-        except FileNotFoundError:
-            return None
+        # The lifetime lease identifies the owner; it does not exclude readers.
+        # Keep the record/token pair consistent and prevent Windows readers from
+        # opening files while the owner deletes or replaces them.
+        with exclusive_file_lock(self._discovery_lock):
+            try:
+                value = json.loads(_read(self.record))
+                token = _read(self.token).strip()
+            except FileNotFoundError:
+                return None
         if not isinstance(value, dict):
             raise ValueError("Invalid service discovery record")
         try:
@@ -107,13 +112,15 @@ class ServiceFiles:
         return record, token
 
     def publish(self, record: ServiceRecord, token: str) -> None:
-        _write(self.token, token)
-        _write(self.record, json.dumps(asdict(record)))
+        with exclusive_file_lock(self._discovery_lock):
+            _write(self.token, token)
+            _write(self.record, json.dumps(asdict(record)))
 
     def clear(self) -> None:
         """Only the exclusive lease holder may remove these records."""
-        self.record.unlink(missing_ok=True)
-        self.token.unlink(missing_ok=True)
+        with exclusive_file_lock(self._discovery_lock):
+            self.record.unlink(missing_ok=True)
+            self.token.unlink(missing_ok=True)
 
 
 def _read(path: Path) -> str:

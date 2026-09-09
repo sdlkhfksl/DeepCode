@@ -279,7 +279,8 @@ def test_cli_launcher_can_exit_while_the_service_remains_available(tmp_path):
             stop_service(files, timeout=0, cancel_running=True)
 
 
-def test_stale_crash_record_with_a_brief_status_lock_still_restarts(tmp_path):
+@pytest.mark.parametrize("_attempt", range(5))
+def test_stale_crash_record_with_a_brief_status_lock_still_restarts(tmp_path, _attempt):
     from app_server.service import serve
     from app_server.service_state import ServiceRecord
 
