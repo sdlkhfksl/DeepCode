@@ -64,6 +64,10 @@ test baseline does not replace installation compatibility checks.
 
 Inspect the earliest failing step. Python and Windows jobs upload JUnit reports
 with test names and durations; browser jobs retain failure traces and screenshots.
+Python logs name each test as it runs. If one test takes longer than 60 seconds,
+pytest prints all Python thread stacks; this is diagnostic output, not an extended
+deadline or a successful result. Unhandled background-thread exceptions and
+unraisable exceptions fail the test instead of appearing only as warnings.
 Packaged startup errors include worker output. A failure while stopping the test
 service is attached to the original exception, and temporary cleanup is still
 attempted. A cleanup failure on its own also fails the check.
@@ -72,3 +76,17 @@ PR updates cancel superseded runs. Rust dependency and pre-commit caches reduce
 repeated setup; caches do not substitute for tests or package validation. A cold
 cache must produce the same verdict as a warm cache. Failed tests are not
 automatically retried until they turn green.
+
+## Keep concurrency tests independent of machine speed
+
+Submitting a Turn or observing an Automation Run as `RUNNING` does not guarantee
+that the Agent has started consuming its input. Before interrupting a scripted
+Agent whose next step depends on consuming the current step, wait for an explicit
+signal from that Agent. Assert execution counts after the relevant work settles.
+Do not use a fixed sleep as evidence that work started or finished.
+
+The automation Goal-run suite runs every scenario with immediate and deferred
+Agent dispatch. The deferred variant deliberately delays Agent entry to expose
+assumptions about thread scheduling; it does not retry a failed test. Both variants
+must pass in each Python version. When a race is found, first reproduce the adverse
+ordering, then fix the synchronization and retain coverage for that ordering.

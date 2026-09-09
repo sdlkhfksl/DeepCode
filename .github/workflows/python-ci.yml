@@ -50,7 +50,7 @@ jobs:
         if: steps.scope.outputs.runtime_changed == 'true'
         run: |
           python -m pip check
-          python -m pytest -q --durations=10 --junitxml=test-results/python.xml
+          python -m pytest -v --durations=10 --junitxml=test-results/python.xml
 
       - name: Upload test results
         if: always() && steps.scope.outputs.runtime_changed == 'true'
@@ -94,7 +94,7 @@ jobs:
       - name: Verify shared leases, startup recovery, and scheduler leadership
         if: steps.scope.outputs.runtime_changed == 'true'
         run: >-
-          python -m pytest -q --durations=10 --junitxml=test-results/windows-lifecycle.xml
+          python -m pytest -v --durations=10 --junitxml=test-results/windows-lifecycle.xml
           tests/application/test_application_lease.py
           tests/application/test_automation_scheduler_leadership.py
           tests/application/test_session_deletion_service.py
@@ -106,7 +106,7 @@ jobs:
       - name: Verify Windows ACLs and Job Object sandbox
         if: steps.scope.outputs.runtime_changed == 'true'
         run: >-
-          python -m pytest -q --durations=10 --junitxml=test-results/windows-platform.xml
+          python -m pytest -v --durations=10 --junitxml=test-results/windows-platform.xml
           tests/test_private_storage_windows.py
           tests/test_harness_sandbox.py
           tests/test_exec_sandbox_wiring.py
