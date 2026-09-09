@@ -85,9 +85,11 @@ jobs:
 
       - name: Install package and test tools
         if: steps.scope.outputs.runtime_changed == 'true'
+        shell: bash
         run: |
           python -m pip install -r scripts/ci/requirements.lock
           python -m pip install --no-deps --no-build-isolation -e ".[test]"
+          python -m pip check
 
       - name: Verify shared leases, startup recovery, and scheduler leadership
         if: steps.scope.outputs.runtime_changed == 'true'
