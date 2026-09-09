@@ -1041,6 +1041,13 @@ def test_legacy_unreserved_turn_is_never_adopted_as_automation_initial_turn(
         assert foreign.prompt == "A legacy client won the race"
         assert foreign.id != execution.run.turn_id
 
+        # Submission can return before the Agent consumes its scripted step.
+        # Interrupt only after that step is claimed, so the Automation receives
+        # the second (completing) step rather than the foreign Turn's gate.
+        _wait_until(
+            lambda: factory.started_prompts == [foreign.prompt],
+            "foreign Agent to consume its scripted step",
+        )
         accepted, interrupted = application.turns.interrupt(
             automation.thread_id,
             foreign.id,
