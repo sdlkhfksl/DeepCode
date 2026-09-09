@@ -75,8 +75,14 @@ class ServiceClient:
                 response.raise_for_status()
                 value = response.json()
         except (httpx.HTTPError, ValueError) as exc:
+            # Keep diagnostics actionable without echoing request headers/tokens.
+            detail = (
+                f"HTTP {exc.response.status_code}"
+                if isinstance(exc, httpx.HTTPStatusError)
+                else type(exc).__name__
+            )
             raise ServiceUnavailable(
-                "Cannot communicate with the local DeepCode service; check service logs"
+                f"Cannot communicate with the local DeepCode service ({detail}); check service logs"
             ) from exc
         if not isinstance(value, dict) or value.get("id") != 1:
             raise ServiceUnavailable("Invalid service response")

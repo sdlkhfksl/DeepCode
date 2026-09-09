@@ -370,3 +370,35 @@ def test_same_port_restart_after_server_closes_a_live_connection(tmp_path, monke
     finally:
         if files.running():
             stop_service(files, timeout=5, cancel_running=True)
+
+
+def test_probe_errors_identify_transport_failure_without_echoing_secrets(monkeypatch):
+    from types import SimpleNamespace
+
+    import httpx
+
+    record = ServiceRecord("a" * 32, "unused.sqlite3", 1, 3081)
+    files = SimpleNamespace(running=lambda: True, read=lambda: (record, "secret-token"))
+
+    def fail(**kwargs):
+        raise httpx.ConnectError("request contained secret-token")
+
+    monkeypatch.setattr(httpx, "Client", fail)
+    with pytest.raises(ServiceUnavailable, match="ConnectError") as error:
+        ServiceClient(files).call("status")
+    assert "secret-token" not in str(error.value)
+
+
+def test_startup_timeout_keeps_the_last_probe_failure(tmp_path):
+    from types import SimpleNamespace
+
+    from cli.service_cli import _wait_ready
+
+    def fail(*args, **kwargs):
+        raise ServiceUnavailable("Cannot communicate with the local service (HTTP 403)")
+
+    client = SimpleNamespace(
+        call=fail, files=SimpleNamespace(log=tmp_path / "service.log")
+    )
+    with pytest.raises(ServiceUnavailable, match="Last check:.*HTTP 403"):
+        _wait_ready(client, timeout=0)

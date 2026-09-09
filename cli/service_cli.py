@@ -166,6 +166,7 @@ def _wait_ready(
     existing_only=False,
 ) -> dict | None:
     deadline = time.monotonic() + timeout
+    last_failure = "No service probe completed"
     while True:
         try:
             status = client.call("status", timeout=1)
@@ -178,8 +179,8 @@ def _wait_ready(
                 continue
             if status["phase"] == "ready":
                 return status
-        except ServiceUnavailable:
-            pass
+        except ServiceUnavailable as exc:
+            last_failure = str(exc)
         # A status probe can hold the lifetime lock briefly. If that apparent
         # owner exits, the caller must launch instead of waiting for a phantom.
         if existing_only and not client.files.running():
@@ -194,7 +195,8 @@ def _wait_ready(
             )
         if time.monotonic() >= deadline:
             raise ServiceUnavailable(
-                f"Service did not become ready; inspect {client.files.log}"
+                f"Service did not become ready; inspect {client.files.log}. "
+                f"Last check: {last_failure}"
             )
         time.sleep(0.1)
 
